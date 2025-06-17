@@ -1,4 +1,4 @@
-name: doa-env
+name: doa-envi
 channels:
   - defaults
   - conda-forge
