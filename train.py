@@ -43,7 +43,8 @@ class DataGenerator(Sequence):
 
         for i, entry in enumerate(batch_entries):
             try:
-                X[i,] = np.load(entry[0])
+                arr = np.squeeze(np.load(entry[0]))  # Ensures (25,513,6)
+                X[i,] = arr
             except Exception as e:
                 print(str(e))
                 print("Error loading: " + str(i))
