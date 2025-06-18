@@ -113,7 +113,7 @@ def main():
 
     earlyStopping = EarlyStopping(monitor='val_loss', patience=30, mode='min')
     mcp_save = ModelCheckpoint(savepath, save_best_only=True, monitor='val_loss', mode='min')
-    model.compile(optimizer='adam' , loss ='mse' , metrics=['mae']
+    model.compile(optimizer='adam' , loss ='mse' , metrics=['mae'])
     history = model.fit(
         training_generator,
         validation_data=validation_generator,
