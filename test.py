@@ -13,7 +13,6 @@ import dsp
 import numpy as np
 from scipy.io.wavfile import read
 from tensorflow.keras.models import load_model
-from tensorflow.keras.model import LSTM
 from feature_extractor import getNormalizedIntensity
 
 
