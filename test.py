@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jan  4 14:19:30 2019
-
-@author: WSJF7149
+Modified test script to support loading .keras models using custom_objects.
 """
+
 import csv
 import os
 import argparse
@@ -12,18 +11,16 @@ import grid
 import dsp
 import numpy as np
 from scipy.io.wavfile import read
-from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import LSTM, Bidirectional, Dense, Dropout, Conv2D, BatchNormalization, MaxPooling2D, Reshape, TimeDistributed, InputLayer
 from feature_extractor import getNormalizedIntensity
 
+from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import (LSTM, Bidirectional, Dense, Dropout,
+                                     Conv2D, BatchNormalization, MaxPooling2D,
+                                     Reshape, TimeDistributed, InputLayer)
 
 def toLOCATA(azi, ele):
-    # azi -= 90
-    # if (azi < -180):
-    #     azi += 360
     ele = 90 - ele
     return azi, ele
-
 
 def tensor_angle(a, b):
     half_delta = (a - b) / 2
@@ -35,15 +32,13 @@ def tensor_angle(a, b):
         print("encountered {} NANs".format(num_nan))
     return angle
 
-
 def acn2fuma(x_in):
     x_out = np.array([x_in[0, :] / math.sqrt(2.0), x_in[3, :], x_in[1, :], x_in[2, :]])
     return x_out
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='test',
-                                     description="""Script to test the DOA estimation system""")
+                                     description="Script to test the DOA estimation system")
     parser.add_argument("--input", "-i", required=True, help="Directory of input audio files", type=str)
     parser.add_argument("--label", "-l", required=True, help="Path to label", type=str)
     parser.add_argument("--model", "-m", type=str, required=True, help="Model path")
@@ -59,102 +54,92 @@ if __name__ == '__main__':
         exit(1)
 
     labelpath = os.path.join(args.label)
-    csvfile = open(labelpath, 'r')
-    csvreader = csv.reader(csvfile)
-    next(csvreader, None)
-    test_data = list(csvreader)
+    with open(labelpath, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        next(csvreader, None)
+        test_data = list(csvreader)
 
-    model = load_model(args.model, compile=False)
+    _custom_objects = {
+        "LSTM": LSTM,
+        "Bidirectional": Bidirectional,
+        "Dense": Dense,
+        "Dropout": Dropout,
+        "Conv2D": Conv2D,
+        "BatchNormalization": BatchNormalization,
+        "MaxPooling2D": MaxPooling2D,
+        "Reshape": Reshape,
+        "TimeDistributed": TimeDistributed,
+        "InputLayer": InputLayer
+    }
+
+    model = load_model(args.model, compile=False, custom_objects=_custom_objects)
 
     feature_tensor = []
     labels = []
     for line in test_data:
-        # read data and label
         wavpath = os.path.join(args.input, line[0])
         if not wavpath.endswith('wav'):
-            wavpath = wavpath + '.wav'
+            wavpath += '.wav'
         fs, x = read(wavpath)
         x = x.T
         if args.do_convert:
             print("converting ACN input to FUMA...")
             x = acn2fuma(x)
-        # Compute the STFT
         nChannel, nSmp = x.shape
-        lFrame = 1024  # size of the STFT window, in samples
+        lFrame = 1024
         nBand = lFrame // 2 + 1
-        nOverlap = lFrame // 2
-        hop = lFrame - nOverlap
+        hop = lFrame // 2
         lSentence = nSmp // hop
         x_f = np.empty((nChannel, lSentence, nBand), dtype=complex)
         for iChannel in range(nChannel):
             x_f[iChannel] = dsp.stft(x[iChannel], lWindow=lFrame)
-
-        # The neural network can only process buffers of 25 frames
-        lBuffer = 25
-        nBatch = 1
-        x_f = x_f[np.newaxis, :, :lBuffer, :]  # First axis corresponding to the batches of 25 frames to process; here there's only 1
-
-        # Get the input feature for the neural network
+        x_f = x_f[np.newaxis, :, :25, :]
         feature = getNormalizedIntensity(x_f)
-
         label = [float(x) for x in line[4:6]]
         labels.append(label)
         feature_tensor.append(feature)
 
     inputFeat_f = np.vstack(feature_tensor)
-    nBatch = inputFeat_f.shape[0]
     print("feature:{}".format(inputFeat_f.shape))
 
-    # Make the prediction
     predictProbaByFrame = model.predict(inputFeat_f)
-
-    # Average the predictions over a sequence of 25 frames
     predictProbaByBatch = np.mean(predictProbaByFrame, axis=1)
 
-    # Load the discretized sphere corresponding to the network's output classes
-    gridStep = 10  # Approximate angle between two DoAs on the grid, in degrees
-    neighbour_tol = 2 * gridStep  # angular diameter of a neighborhood, for spatial smoothing and peak selection
-    el_grid, az_grid = grid.makeDoaGrid(gridStep)
-
-    # Get the main peaks and the corresponding elevations and azimuths
-    el_pred = np.empty(nBatch)
-    az_pred = np.empty(nBatch)
-
+    el_grid, az_grid = grid.makeDoaGrid(10)
+    neighbour_tol = 20
     errors = []
-    for iBatch in range(nBatch):
+
+    for i, prediction in enumerate(predictProbaByBatch):
         if args.loss == "cartesian":
-            dir = predictProbaByBatch[iBatch] / np.linalg.norm(predictProbaByBatch[iBatch])
+            dir = prediction / np.linalg.norm(prediction)
             new_azi = math.atan2(-dir[1], -dir[0])
             new_ele = math.acos(dir[2])
-            error = tensor_angle(np.array([new_azi, new_ele]), np.array(labels[iBatch]))
-            # print("{} vs {}".format(np.array([new_azi, new_ele]), labels[iBatch]))
+            error = tensor_angle(np.array([new_azi, new_ele]), np.array(labels[i]))
         else:
-            # Find all the main peaks of the prediction (spatial smoothing is performed)
-            peaks, iPeaks = grid.peaksOnGrid(predictProbaByBatch[iBatch], el_grid, az_grid, neighbour_tol)
-
-            # Select the right number of sources
+            peaks, iPeaks = grid.peaksOnGrid(prediction, el_grid, az_grid, neighbour_tol)
             iMax = np.argmax(peaks)
             predIdx = iPeaks[iMax]
-
-            el_pred[iBatch] = el_grid[predIdx]
-            az_pred[iBatch] = az_grid[predIdx]
-
-            new_azi, new_ele = toLOCATA(az_pred[iBatch], el_pred[iBatch])
-            error = tensor_angle(np.deg2rad([new_azi, new_ele]), np.array(labels[iBatch]))
+            el_pred = el_grid[predIdx]
+            az_pred = az_grid[predIdx]
+            new_azi, new_ele = toLOCATA(az_pred, el_pred)
+            error = tensor_angle(np.deg2rad([new_azi, new_ele]), np.array(labels[i]))
 
         errors.append(error)
-        print('predicted = ({:.4}, {:.4}), true = ({:.4}, {:.4}), error = {:.4}'.format(np.rad2deg(new_azi),
-                                                                                        np.rad2deg(new_ele),
-                                                                                        np.rad2deg(labels[iBatch][0]),
-                                                                                        np.rad2deg(labels[iBatch][1]),
-                                                                                        np.rad2deg(error)))
+        print('predicted = ({:.4}, {:.4}), true = ({:.4}, {:.4}), error = {:.4}'.format(
+            np.rad2deg(new_azi), np.rad2deg(new_ele),
+            np.rad2deg(labels[i][0]), np.rad2deg(labels[i][1]),
+            np.rad2deg(error)))
+
     angle_observations = np.array([5, 10, 15])
-    angle_cnts = np.zeros(shape=angle_observations.shape)
-    for i, deg in enumerate(angle_observations):
-        angle_cnts[i] += (errors <= np.deg2rad(deg)).sum()
+    angle_cnts = np.array([(np.rad2deg(errors) <= deg).sum() for deg in angle_observations])
     angle_accuracy = angle_cnts / len(errors)
-    for i, accuracy in enumerate(angle_accuracy):
-        print("accuracy/deg{}: {:.4}%".format(angle_observations[i], accuracy * 100))
-    print("average error: {:.4} degrees".format(np.mean(np.rad2deg(errors))))
-    print("{},{:.4}%,{:.4}%,{:.4}%,{:.4}".format(args.model, angle_accuracy[0] * 100, angle_accuracy[1] * 100,
-                                                 angle_accuracy[2] * 100, np.mean(np.rad2deg(errors))))
+    for deg, acc in zip(angle_observations, angle_accuracy):
+        print(f"accuracy/deg{deg}: {acc * 100:.4f}%")
+    print(f"average error: {np.mean(np.rad2deg(errors)):.4f} degrees")
+    print("{},{:.4f}%,{:.4f}%,{:.4f}%,{:.4f}".format(
+        args.model,
+        angle_accuracy[0] * 100,
+        angle_accuracy[1] * 100,
+        angle_accuracy[2] * 100,
+        np.mean(np.rad2deg(errors))
+    ))
