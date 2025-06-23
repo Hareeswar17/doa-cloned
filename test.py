@@ -12,7 +12,8 @@ import grid
 import dsp
 import numpy as np
 from scipy.io.wavfile import read
-from keras.models import load_model
+from tensorflow.keras.models import load_model
+from tensorflow.keras.model import LSTM
 from feature_extractor import getNormalizedIntensity
 
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     next(csvreader, None)
     test_data = list(csvreader)
 
-    model = load_model(args.model)
+    model = load_model(args.model, compile=False)
 
     feature_tensor = []
     labels = []
