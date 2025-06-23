@@ -1,6 +1,7 @@
+
 # -*- coding: utf-8 -*-
 """
-Modified test script to support loading .keras models using custom_objects.
+Modified test script with get_custom_objects registration for .keras model loading.
 """
 
 import csv
@@ -17,6 +18,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import (LSTM, Bidirectional, Dense, Dropout,
                                      Conv2D, BatchNormalization, MaxPooling2D,
                                      Reshape, TimeDistributed, InputLayer)
+from keras.saving import get_custom_objects
 
 def toLOCATA(azi, ele):
     ele = 90 - ele
@@ -41,7 +43,7 @@ if __name__ == '__main__':
                                      description="Script to test the DOA estimation system")
     parser.add_argument("--input", "-i", required=True, help="Directory of input audio files", type=str)
     parser.add_argument("--label", "-l", required=True, help="Path to label", type=str)
-    parser.add_argument("--model", "-m", type=str, required=True, help="Model path")
+    parser.add_argument("--model", "-m", type=str, required=True, help="Model path (.keras format)")
     parser.add_argument("--loss", "-lo", type=str, choices=["categorical", "cartesian"],
                         default="categorical", help="Choose loss representation")
     parser.add_argument('--convert', "-c", dest='do_convert', action='store_true',
@@ -53,13 +55,8 @@ if __name__ == '__main__':
         print("input path {} non-exist, abort!".format(args.input))
         exit(1)
 
-    labelpath = os.path.join(args.label)
-    with open(labelpath, 'r') as csvfile:
-        csvreader = csv.reader(csvfile)
-        next(csvreader, None)
-        test_data = list(csvreader)
-
-    _custom_objects = {
+    # Register custom layers globally for Keras model deserialization
+    get_custom_objects().update({
         "LSTM": LSTM,
         "Bidirectional": Bidirectional,
         "Dense": Dense,
@@ -70,9 +67,15 @@ if __name__ == '__main__':
         "Reshape": Reshape,
         "TimeDistributed": TimeDistributed,
         "InputLayer": InputLayer
-    }
+    })
 
-    model = load_model(args.model, compile=False, custom_objects=_custom_objects)
+    labelpath = os.path.join(args.label)
+    with open(labelpath, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        next(csvreader, None)
+        test_data = list(csvreader)
+
+    model = load_model(args.model, compile=False)
 
     feature_tensor = []
     labels = []
