@@ -15,6 +15,7 @@ from feature_extractor import getNormalizedIntensity
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import (Input, Conv2D, BatchNormalization, MaxPooling2D, Dropout,
                                      Reshape, Bidirectional, LSTM, TimeDistributed, Dense)
+from keras.saving import get_custom_objects
 
 def build_cartesian_model(input_shape=(25, 513, 6)):
     inp = Input(shape=input_shape, name="input0")
@@ -70,6 +71,20 @@ if __name__ == '__main__':
     parser.add_argument("--convert", "-c", dest="do_convert", action="store_true", help="Enable ACN to FUMA")
     parser.set_defaults(do_convert=False)
     args = parser.parse_args()
+
+    # Register custom layers globally for Keras model deserialization
+    get_custom_objects().update({
+        "LSTM": LSTM,
+        "Bidirectional": Bidirectional,
+        "Dense": Dense,
+        "Dropout": Dropout,
+        "Conv2D": Conv2D,
+        "BatchNormalization": BatchNormalization,
+        "MaxPooling2D": MaxPooling2D,
+        "Reshape": Reshape,
+        "TimeDistributed": TimeDistributed,
+        "Input": Input
+    })
 
     # Load model safely
     print("Loading model architecture...")
