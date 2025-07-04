@@ -59,7 +59,7 @@ def frame(s, lWindow=1024, window='sin', nOverlap=None):
     s = np.asarray(s)
     if s.ndim != 1:
         raise ValueError('input signal must be 1D')
-    if window is 'sin':
+    if window == 'sin':
         window = np.sin(np.arange(0.5, lWindow+0.5)/lWindow*np.pi)
     elif isinstance(window, str):
         window = signal.get_window(window, lWindow)
@@ -116,7 +116,7 @@ def ola(sFr, window='sin', nOverlap=None):
     sFr = np.asarray(sFr)
     # Check inputs
     nFrame, lWindow = sFr.shape
-    if window is 'sin':
+    if window == 'sin':
         window = np.sin(np.arange(0.5, lWindow+0.5)/lWindow*np.pi)
     elif isinstance(window, str):
         window = signal.get_window(window, lWindow)
