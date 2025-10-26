@@ -45,27 +45,4 @@ Note that `categorical_trained_model.h5` is trained from `Perotin_categorical_tr
     python3 test.py -i [test_wav_dir] -l [test_wav_dir]/test_labels.csv -m models/Perotin_categorical_trained_model.h5 -lo categorical -c
     ```
 
-## Citation
-If you use our codes or models, please consider citing:
-```
-@inproceedings{Tang2019,
-  author={Zhenyu Tang and John D. Kanu and Kevin Hogan and Dinesh Manocha},
-  title={{Regression and Classification for Direction-of-Arrival Estimation with Convolutional Recurrent Neural Networks}},
-  year=2019,
-  booktitle={Proc. Interspeech 2019},
-  pages={654--658},
-  doi={10.21437/Interspeech.2019-1111},
-  url={http://dx.doi.org/10.21437/Interspeech.2019-1111}
-}
-```
-We also recommend citing the work of Perontin et al. if you also use their model:
-```
-@inproceedings{perotin2018crnn,
-  title={CRNN-based joint azimuth and elevation localization with the Ambisonics intensity vector},
-  author={Perotin, Laur{\'e}line and Serizel, Romain and Vincent, Emmanuel and Gu{\'e}rin, Alexandre},
-  booktitle={2018 16th International Workshop on Acoustic Signal Enhancement (IWAENC)},
-  pages={241--245},
-  year={2018},
-  organization={IEEE}
-}
-```
+
