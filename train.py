@@ -5,7 +5,11 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import (LSTM, Bidirectional, Dense, Dropout,
+                                     Conv2D, BatchNormalization, MaxPooling2D,
+                                     Reshape, TimeDistributed, InputLayer)
 from tensorflow.keras.utils import Sequence, to_categorical
+from keras.saving import get_custom_objects
 import matplotlib.pyplot as plt
 from doa_math import DoaClasses, lookup_class_index
 from sklearn.model_selection import train_test_split
@@ -85,12 +89,26 @@ def main():
     parser.add_argument("--output", "-o", default="models", help="Directory to write results", type=str)
     parser.add_argument("--batchsize", "-b", type=int, default=256, help="Choose a batchsize")
     parser.add_argument("--epochs", "-e", type=int, default=100, help="Number of epochs")
-    parser.add_argument("--model", "-m", type=str, required=True, help="Model path (.keras or .h5)")
+    parser.add_argument("--model", "-m", type=str, required=True, help="Model path (.keras format)")
     parser.add_argument("--loss", "-lo", type=str, choices=["categorical", "cartesian"], required=True)
 
     args = parser.parse_args()
     assert os.path.exists(args.input), "Input folder does not exist!"
     assert os.path.exists(args.label), "Label csv does not exist!"
+
+    # Register custom layers globally for Keras model deserialization
+    get_custom_objects().update({
+        "LSTM": LSTM,
+        "Bidirectional": Bidirectional,
+        "Dense": Dense,
+        "Dropout": Dropout,
+        "Conv2D": Conv2D,
+        "BatchNormalization": BatchNormalization,
+        "MaxPooling2D": MaxPooling2D,
+        "Reshape": Reshape,
+        "TimeDistributed": TimeDistributed,
+        "InputLayer": InputLayer
+    })
 
     label_path = args.label
     train_data = read_data_entries(label_path, args.input)
